@@ -1,0 +1,87 @@
+import requests
+from bs4 import BeautifulSoup
+import json
+import time
+
+# Let's define the function to scrape a coffee shop
+def scrape_coffee_menu(shop_name, url, category_name):
+    print(f"Scraping {shop_name} - {category_name}...")
+    
+    # We use a header so the website thinks we are a normal browser, not a bot!
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        print(f"Failed to retrieve webpage. Status Code: {response.status_code}")
+        return []
+
+    # Initialize BeautifulSoup 4.14.3
+    soup = BeautifulSoup(response.text, 'html.parser')
+    menu_data = []
+
+    # ==========================================
+    # ⚠️ IMPORTANT: HOW TO ADAPT THIS CODE
+    # 1. Go to the coffee shop website on Chrome.
+    # 2. Right-click a coffee item and click "Inspect".
+    # 3. Find the main HTML tag holding the item (e.g., <div class="product-card">).
+    # 4. Replace 'product-card' below with that actual class name.
+    # ==========================================
+    
+    # Find all the individual coffee item containers
+    items = soup.find_all('div', class_='product-card') # <--- CHANGE THIS CLASS
+
+    for item in items:
+        try:
+            # Find the Name (e.g., <h3 class="product-title">)
+            name_tag = item.find('h3', class_='product-title') # <--- CHANGE THIS CLASS
+            name = name_tag.text.strip() if name_tag else "Unknown Coffee"
+
+            # Find the Description
+            desc_tag = item.find('p', class_='product-description') # <--- CHANGE THIS CLASS
+            description = desc_tag.text.strip() if desc_tag else "No description available."
+
+            # Find the Price and clean it up (remove '₱' and commas)
+            price_tag = item.find('span', class_='product-price') # <--- CHANGE THIS CLASS
+            raw_price = price_tag.text.strip() if price_tag else "0"
+            clean_price = float(raw_price.replace('₱', '').replace(',', '').strip())
+
+            # Append to our list in the exact format Brewly expects!
+            menu_data.append({
+                "name": name,
+                "category": category_name,
+                "description": description,
+                "price": clean_price
+            })
+            
+        except Exception as e:
+            print(f"Skipping an item due to error: {e}")
+
+    return menu_data
+
+# === MAIN EXECUTION ===
+if __name__ == "__main__":
+    # Example: Scraping the Hot and Iced sections of a website
+    # You will replace these URLs with the actual Starbucks or Zus pages
+    zus_hot_url = "https://example.com/zus-coffee/hot-drinks"
+    zus_iced_url = "https://example.com/zus-coffee/iced-drinks"
+
+    final_menu = []
+    
+    # Scrape Hot Drinks
+    hot_drinks = scrape_coffee_menu("Zus Coffee", zus_hot_url, "Hot")
+    final_menu.extend(hot_drinks)
+    
+    time.sleep(2) # Pause for 2 seconds to be polite to the server
+    
+    # Scrape Iced Drinks
+    iced_drinks = scrape_coffee_menu("Zus Coffee", zus_iced_url, "Iced")
+    final_menu.extend(iced_drinks)
+
+    # Save the scraped data into a JSON file for your React Native app!
+    with open('zus_menu_scraped.json', 'w', encoding='utf-8') as f:
+        json.dump(final_menu, f, ensure_ascii=False, indent=4)
+
+    print("\n Scraping complete! Check the 'zus_menu_scraped.json' file.")
